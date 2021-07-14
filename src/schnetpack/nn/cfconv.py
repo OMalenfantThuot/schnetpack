@@ -42,7 +42,7 @@ class CFConv(nn.Module):
         self.cutoff_network = cutoff_network
         self.agg = Aggregate(axis=axis, mean=normalize_filter)
 
-    def forward(self, x, r_ij, neighbors, pairwise_mask, f_ij=None):
+    def forward(self, x, r_ij, neighbors, pairwise_mask, f_ij=None, at_idx=None, map_back_idx=None):
         """Compute convolution block.
 
         Args:
@@ -64,6 +64,9 @@ class CFConv(nn.Module):
 
         # pass expanded interactomic distances through filter block
         W = self.filter_network(f_ij)
+        #print(W.size())
+        #print(W[0,0,0])
+
         # apply cutoff
         if self.cutoff_network is not None:
             C = self.cutoff_network(r_ij)
@@ -72,14 +75,35 @@ class CFConv(nn.Module):
         # pass initial embeddings through Dense layer
         y = self.in2f(x)
         # reshape y for element-wise multiplication by W
-        nbh_size = neighbors.size()
-        nbh = neighbors.view(-1, nbh_size[1] * nbh_size[2], 1)
-        nbh = nbh.expand(-1, -1, y.size(2))
-        y = torch.gather(y, 1, nbh)
-        y = y.view(nbh_size[0], nbh_size[1], nbh_size[2], -1)
+        #print(y.size())
+        #print(y)
+        #print(nbh.size())
+        #print(nbh)
+        #print(nbh.size())
+        #print(map_back_idx.size())
+
+        if at_idx is None:
+            nbh_size = neighbors.size()
+            nbh = neighbors.view(-1, nbh_size[1] * nbh_size[2], 1)
+            nbh = nbh.expand(-1, -1, y.size(2))
+            y = torch.gather(y, 1, nbh)
+            y = y.view(nbh_size[0], nbh_size[1], nbh_size[2], -1)
+        else:
+            idx_size = map_back_idx.size()
+            mbi = map_back_idx.view(-1, idx_size[1] * idx_size[2], 1)
+            mbi = mbi.expand(-1, -1, y.size(2))
+            #print(y.size())
+            #print(map_back_idx)
+            y = torch.gather(y, 1, mbi)
+            y = y.view(idx_size[0], idx_size[1], idx_size[2], -1)
+            #print(y.size())
+            #print(y[:, 0, :])
+            #print(y[:, 1, :])
+            #print(y[:, 2, :])
 
         # element-wise multiplication, aggregating and Dense layer
         y = y * W
         y = self.agg(y, pairwise_mask)
         y = self.f2out(y)
+        #print("y", y.size())
         return y

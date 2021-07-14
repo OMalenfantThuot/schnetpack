@@ -10,6 +10,7 @@ def atom_distances(
     return_vecs=False,
     normalize_vecs=False,
     neighbor_mask=None,
+    at_idx=None,
 ):
     r"""Compute distance of every atom to its neighbors.
 
@@ -50,7 +51,10 @@ def atom_distances(
     pos_xyz = positions[idx_m, neighbors[:, :, :], :]
 
     # Subtract positions of central atoms to get distance vectors
-    dist_vec = pos_xyz - positions[:, :, None, :]
+    if at_idx is None:
+        dist_vec = pos_xyz - positions[:, :, None, :]
+    else:
+        dist_vec = pos_xyz - positions[:, at_idx, None, :].unsqueeze(1)
 
     # add cell offset
     if cell is not None:
@@ -96,7 +100,7 @@ class AtomDistances(nn.Module):
         self.return_directions = return_directions
 
     def forward(
-        self, positions, neighbors, cell=None, cell_offsets=None, neighbor_mask=None
+        self, positions, neighbors, cell=None, cell_offsets=None, neighbor_mask=None, at_idx=None
     ):
         r"""Compute distance of every atom to its neighbors.
 
@@ -124,6 +128,7 @@ class AtomDistances(nn.Module):
             return_vecs=self.return_directions,
             normalize_vecs=True,
             neighbor_mask=neighbor_mask,
+            at_idx=at_idx
         )
 
 

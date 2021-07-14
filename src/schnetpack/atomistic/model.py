@@ -36,7 +36,7 @@ class AtomisticModel(nn.Module):
         # For stress tensor
         self.requires_stress = any([om.stress for om in self.output_modules])
 
-    def forward(self, inputs):
+    def forward(self, inputs, at_idx=None):
         """
         Forward representation output through output modules.
         """
@@ -62,8 +62,8 @@ class AtomisticModel(nn.Module):
                 inputs[Properties.cell], displacement
             )
 
-        inputs["representation"] = self.representation(inputs)
+        inputs["representation"] = self.representation(inputs, at_idx=at_idx)
         outs = {}
         for output_model in self.output_modules:
-            outs.update(output_model(inputs))
+            outs.update(output_model(inputs, at_idx=at_idx))
         return outs

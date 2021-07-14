@@ -131,12 +131,16 @@ class Atomwise(nn.Module):
                 "{} is not a valid aggregation " "mode!".format(aggregation_mode)
             )
 
-    def forward(self, inputs):
+    def forward(self, inputs, at_idx=None):
         r"""
         predicts atomwise property
         """
-        atomic_numbers = inputs[Properties.Z]
-        atom_mask = inputs[Properties.atom_mask]
+        if at_idx is None:
+            atomic_numbers = inputs[Properties.Z]
+            atom_mask = inputs[Properties.atom_mask]
+        else:
+            atomic_numbers = inputs[Properties.Z][:, at_idx]
+            atom_mask = inputs[Properties.atom_mask][:, at_idx]
 
         # run prediction
         yi = self.out_net(inputs)

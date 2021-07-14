@@ -57,7 +57,16 @@ class SchNetInteraction(nn.Module):
         # dense layer
         self.dense = Dense(n_atom_basis, n_atom_basis, bias=True, activation=None)
 
-    def forward(self, x, r_ij, neighbors, neighbor_mask, f_ij=None):
+    def forward(
+        self,
+        x,
+        r_ij,
+        neighbors,
+        neighbor_mask,
+        f_ij=None,
+        at_idx=None,
+        map_back_idx=None,
+    ):
         """Compute interaction output.
 
         Args:
@@ -75,7 +84,15 @@ class SchNetInteraction(nn.Module):
 
         """
         # continuous-filter convolution interaction block followed by Dense layer
-        v = self.cfconv(x, r_ij, neighbors, neighbor_mask, f_ij)
+        v = self.cfconv(
+            x,
+            r_ij,
+            neighbors,
+            neighbor_mask,
+            f_ij,
+            at_idx=at_idx,
+            map_back_idx=map_back_idx,
+        )
         v = self.dense(v)
         return v
 
@@ -193,7 +210,7 @@ class SchNet(nn.Module):
             self.charge = nn.Parameter(torch.Tensor(1, n_atom_basis))
             self.charge.data.normal_(0, 1.0 / n_atom_basis ** 0.5)
 
-    def forward(self, inputs):
+    def forward(self, inputs, at_idx=None):
         """Compute atomic representations/embeddings.
 
         Args:
@@ -206,16 +223,29 @@ class SchNet(nn.Module):
 
         """
         # get tensors from input dictionary
-        atomic_numbers = inputs[Properties.Z]
+        atom_mask = inputs[Properties.atom_mask]
         positions = inputs[Properties.R]
         cell = inputs[Properties.cell]
-        cell_offset = inputs[Properties.cell_offset]
-        neighbors = inputs[Properties.neighbors]
-        neighbor_mask = inputs[Properties.neighbor_mask]
-        atom_mask = inputs[Properties.atom_mask]
+
+        if at_idx is None:
+            atomic_numbers = inputs[Properties.Z]
+            cell_offset = inputs[Properties.cell_offset]
+            neighbors = inputs[Properties.neighbors]
+            neighbor_mask = inputs[Properties.neighbor_mask]
+        else:
+            cell_offset = inputs[Properties.cell_offset][:, at_idx, :, :].unsqueeze(1)
+            neighbors = inputs[Properties.neighbors][:, at_idx, :].unsqueeze(1)
+            unique_neighbors, map_back_idx = torch.unique(neighbors, return_inverse=True)
+            neighbor_mask = inputs[Properties.neighbor_mask][:, at_idx, :].unsqueeze(1)
+            central_atom = inputs[Properties.Z][:, at_idx].unsqueeze(1)
+            atomic_numbers = inputs[Properties.Z][:, unique_neighbors]
 
         # get atom embeddings for the input atomic numbers
-        x = self.embedding(atomic_numbers)
+        if at_idx is None:
+            x = self.embedding(atomic_numbers)
+        else:
+            x = self.embedding(central_atom)
+            x_nbh = self.embedding(atomic_numbers)
 
         if self.charged_systems and Properties.charge in inputs.keys():
             n_atoms = torch.sum(atom_mask, dim=1, keepdim=True)
@@ -224,17 +254,37 @@ class SchNet(nn.Module):
             x = x + charge
 
         # compute interatomic distance of every atom to its neighbors
+        #r_ij = self.distances(
+        #    positions, neighbors, cell, cell_offset, neighbor_mask=neighbor_mask
+        #)
         r_ij = self.distances(
-            positions, neighbors, cell, cell_offset, neighbor_mask=neighbor_mask
+            positions,
+            neighbors,
+            cell,
+            cell_offset,
+            neighbor_mask=neighbor_mask,
+            at_idx=at_idx,
         )
         # expand interatomic distances (for example, Gaussian smearing)
         f_ij = self.distance_expansion(r_ij)
+
         # store intermediate representations
         if self.return_intermediate:
             xs = [x]
         # compute interaction block to update atomic embeddings
         for interaction in self.interactions:
-            v = interaction(x, r_ij, neighbors, neighbor_mask, f_ij=f_ij)
+            if at_idx is None:
+                v = interaction(x, r_ij, neighbors, neighbor_mask, f_ij=f_ij)
+            else:
+                v = interaction(
+                    x_nbh,
+                    r_ij,
+                    neighbors,
+                    neighbor_mask,
+                    f_ij=f_ij,
+                    at_idx=at_idx,
+                    map_back_idx=map_back_idx,
+                )
             x = x + v
             if self.return_intermediate:
                 xs.append(x)
