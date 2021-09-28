@@ -195,7 +195,7 @@ class SymmetryFunctions(nn.Module):
 
         return z_weights
 
-    def forward(self, inputs):
+    def forward(self, inputs, at_idx=None):
         """
         Args:
             inputs (dict of torch.Tensor): SchNetPack format dictionary of input tensors.
@@ -205,19 +205,28 @@ class SymmetryFunctions(nn.Module):
 
         """
         positions = inputs[Properties.R]
-        Z = inputs[Properties.Z]
-        neighbors = inputs[Properties.neighbors]
-        neighbor_mask = inputs[Properties.neighbor_mask]
-
         cell = inputs[Properties.cell]
-        cell_offset = inputs[Properties.cell_offset]
+
+        if at_idx is None:
+            Z = inputs[Properties.Z]
+            neighbors = inputs[Properties.neighbors]
+            neighbor_mask = inputs[Properties.neighbor_mask]
+            cell_offset = inputs[Properties.cell_offset]
+        else:
+            cell_offset = inputs[Properties.cell_offset][:, at_idx, :, :].unsqueeze(1)
+            neighbors = inputs[Properties.neighbors][:, at_idx, :].unsqueeze(1)
+            unique_neighbors, map_back_idx = torch.unique(neighbors, return_inverse=True)
+            neighbor_mask = inputs[Properties.neighbor_mask][:, at_idx, :].unsqueeze(1)
+            central_atom = inputs[Properties.Z][:, at_idx].unsqueeze(1)
+            Z = inputs[Properties.Z][:, unique_neighbors]
+
 
         # Compute radial functions
         if self.RDF is not None:
             # Get atom type embeddings
             Z_rad = self.radial_Z(Z)
             # Get atom types of neighbors
-            Z_ij = snn.neighbor_elements(Z_rad, neighbors)
+            Z_ij = snn.neighbor_elements(Z_rad, neighbors) # ici faut gosser avec map_back_idx
             # Compute distances
             distances = snn.atom_distances(
                 positions,
@@ -225,6 +234,7 @@ class SymmetryFunctions(nn.Module):
                 neighbor_mask=neighbor_mask,
                 cell=cell,
                 cell_offsets=cell_offset,
+                at_idx=at_idx,
             )
             radial_sf = self.RDF(
                 distances, elemental_weights=Z_ij, neighbor_mask=neighbor_mask
@@ -235,15 +245,20 @@ class SymmetryFunctions(nn.Module):
         if self.ADF is not None:
             # Get pair indices
             try:
-                idx_j = inputs[Properties.neighbor_pairs_j]
-                idx_k = inputs[Properties.neighbor_pairs_k]
+                if at_idx is None:
+                    idx_j = inputs[Properties.neighbor_pairs_j]
+                    idx_k = inputs[Properties.neighbor_pairs_k]
+                    neighbor_pairs_mask = inputs[Properties.neighbor_pairs_mask]
+                else:
+                    idx_j = inputs[Properties.neighbor_pairs_j][:, at_idx, :].unsqueeze(1)
+                    idx_k = inputs[Properties.neighbor_pairs_k][:, at_idx, :].unsqueeze(1)
+                    neighbor_pairs_mask = inputs[Properties.neighbor_pairs_mask][:, at_idx, :].unsqueeze(1)
 
             except KeyError as e:
                 raise HDNNException(
                     "Angular symmetry functions require "
                     + "`collect_triples=True` in AtomsData."
                 )
-            neighbor_pairs_mask = inputs[Properties.neighbor_pairs_mask]
 
             # Get element contributions of the pairs
             Z_angular = self.angular_Z(Z)
@@ -251,8 +266,13 @@ class SymmetryFunctions(nn.Module):
             Z_ik = snn.neighbor_elements(Z_angular, idx_k)
 
             # Offset indices
-            offset_idx_j = inputs[Properties.neighbor_offsets_j]
-            offset_idx_k = inputs[Properties.neighbor_offsets_k]
+            if at_idx is None:
+                offset_idx_j = inputs[Properties.neighbor_offsets_j]
+                offset_idx_k = inputs[Properties.neighbor_offsets_k]
+            else:
+                offset_idx_j = inputs[Properties.neighbor_offsets_j][:, at_idx, :].unsqueeze(1)
+                offset_idx_k = inputs[Properties.neighbor_offsets_k][:, at_idx, :].unsqueeze(1)
+
 
             # Compute triple distances
             r_ij, r_ik, r_jk = snn.triple_distances(
@@ -263,6 +283,7 @@ class SymmetryFunctions(nn.Module):
                 offset_idx_k=offset_idx_k,
                 cell=cell,
                 cell_offsets=cell_offset,
+                at_idx=at_idx,
             )
 
             angular_sf = self.ADF(

@@ -140,6 +140,7 @@ def triple_distances(
     offset_idx_k=None,
     cell=None,
     cell_offsets=None,
+    at_idx=None,
 ):
     """
     Get all distances between atoms forming a triangle with the central atoms.
@@ -202,10 +203,17 @@ def triple_distances(
     #    idx_m = idx_m.pin_memory().cuda(async=True)
 
     # Get the real positions of j and k
-    R_ij = pos_j - positions[:, :, None, :]
-    R_ik = pos_k - positions[:, :, None, :]
+    print(at_idx)
+    if at_idx is None:
+        R_ij = pos_j - positions[:, :, None, :]
+        R_ik = pos_k - positions[:, :, None, :]
+    else:
+        R_ij = pos_j - positions[:, at_idx, None, :]
+        R_ik = pos_k - positions[:, at_idx, None, :]
+
     R_jk = pos_j - pos_k
 
+    print(R_ij.size())
     # + 1e-9 to avoid division by zero
     r_ij = torch.norm(R_ij, 2, 3) + 1e-9
     r_ik = torch.norm(R_ik, 2, 3) + 1e-9
