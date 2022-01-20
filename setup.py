@@ -11,9 +11,9 @@ def read(fname):
 
 setup(
     name="schnetpack",
-    version="0.4.0-rc",
+    version="1.0.0",
     author="Kristof T. Schuett, Michael Gastegger, Pan Kessel, Kim Nicoli",
-    email="michael.gastegger@tu-berlin.de",
+    email="kristof.schuett@tu-berlin.de, michael.gastegger@tu-berlin.de",
     url="https://github.com/atomistic-machine-learning/schnetpack",
     packages=find_packages("src"),
     scripts=[
@@ -26,7 +26,7 @@ setup(
     package_dir={"": "src"},
     python_requires=">=3.6",
     install_requires=[
-        "torch>=1.7",
+        "torch>=1.8.0",
         "numpy",
         "ase>=3.21",
         "h5py",
@@ -34,9 +34,7 @@ setup(
         "tqdm",
         "pyyaml",
     ],
-    extras_require={
-        "test": ["pytest", "sacred", "pytest-console-scripts", "pytest-datadir"]
-    },
+    extras_require={"test": ["pytest", "pytest-console-scripts", "pytest-datadir"]},
     license="MIT",
     description="SchNetPack - Deep Neural Networks for Atomistic Systems",
     long_description="""

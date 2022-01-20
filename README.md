@@ -1,6 +1,5 @@
 # SchNetPack - Deep Neural Networks for Atomistic Systems
 [![Build Status](https://travis-ci.com/atomistic-machine-learning/schnetpack.svg?branch=master)](https://travis-ci.com/atomistic-machine-learning/schnetpack)
-[![codecov](https://codecov.io/gh/atomistic-machine-learning/schnetpack/branch/master/graph/badge.svg)](https://codecov.io/gh/atomistic-machine-learning/schnetpack)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/python/black)
 
 
@@ -13,15 +12,12 @@ extensible to custom atomistic architectures.
 - SchNet - an end-to-end continuous-filter CNN for molecules and materials [1-3]
 - wACSF - weighted atom-centered symmetry functions [4,5]
 
-_**Note: This is the last version before a major update. In the next version, 
-we plan to adopt Hydra and PyTorch Lightning, switch to indexing instead of masking and make the networks 
-compatible with TorchScript. Therefore, there will be breaking changes. **_
+_**Note: This is the last version before a major update. In the next version, we plan to adopt Hydra and PyTorch Lightning, switch to indexing instead of masking and make the networks compatible with TorchScript. Therefore, there will be breaking changes.**_
 
 ##### Requirements:
-- python 3
 - ASE
 - numpy
-- PyTorch (>=0.4.1)
+- PyTorch (>=1.8)
 - h5py
 - Optional: tensorboardX
 
@@ -92,7 +88,7 @@ or the [standalone version](https://github.com/dmlc/tensorboard).
 To evaluate the trained model with the best validation error, call
 
 ```
-spk_run.py eval <modeldir> --split test [--cuda]
+spk_run.py eval <datapath> <modeldir> --split test [--cuda]
 ```
 
 which will run on the specified `--split` and write a result file `evaluation.txt` into the model directory.
